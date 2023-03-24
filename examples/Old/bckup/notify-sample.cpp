@@ -15,18 +15,21 @@
 #include <string>
 #include <cstring>
 #include <cmath>
+#include <unistd.h>
 
 #include <vsomeip/vsomeip.hpp>
 
-#include "serialprt.hpp"
+//#include "serial_port.hpp"
 
 #include "sample-ids.hpp"
+#include "serialprt.hpp"
 
 char buff[512];
+char tmpbuff[512];
 int found=0;
-char payload[512]="{\"DD\":1,\"AD\":1,\"DW\":0,\"AW\":0,\"TD\":0,\"HD\":0,\"SD\":1,\"Dist\":00.00}";
-int data_len=0;
-int data_read_flg=0;
+	char payload[512]="{\"DD\":1,\"AD\":1,\"DW\":0,\"AW\":0,\"TD\":0,\"HD\":0,\"SD\":1,\"Dist\":00.00}";
+using namespace std;
+
 class service_sample {
 public:
     service_sample(bool _use_tcp, uint32_t _cycle) :
@@ -39,18 +42,18 @@ public:
             is_offered_(false),
             offer_thread_(std::bind(&service_sample::run, this)),
             notify_thread_(std::bind(&service_sample::notify, this)),
-            serial_rx_thread_(std::bind(&service_sample::serial_rx, this)) { //Added by santhosh to read the serial data as serial data read is blocked read
+            serial_rx_thread_(std::bind(&service_sample::serial_rx, this)) {
     }
-    //Add by santhosh - This is serial read thread 
 	void serial_rx()
 	{
 		while(1)
 		{
-			data_len=serial_1(buff); // Read the UART0 data (UWB reciver )
-			data_read_flg=1;
+			serial_1(tmpbuff);
+			std::cout<<"serial_rx: "<<tmpbuff<<std::endl;
+			
 		}
-		
 	}
+
     bool init() {
         std::lock_guard<std::mutex> its_lock(mutex_);
 
@@ -178,7 +181,7 @@ public:
         std::unique_lock<std::mutex> its_lock(mutex_);
         while (!blocked_)
             condition_.wait(its_lock);
-
+            
         bool is_offer(true);
         while (running_) {
             if (is_offer)
@@ -189,10 +192,53 @@ public:
             for (int i = 0; i < 10 && running_; i++)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-          //  is_offer = !is_offer; // Commented by santhosh - To remove stop offering condition. 
+           // is_offer = !is_offer;
         }
     }
 	
+#if 1
+ void notify() {
+	
+        std::shared_ptr<vsomeip::message> its_message
+            = vsomeip::runtime::get()->create_request(use_tcp_);
+
+        its_message->set_service(SAMPLE_SERVICE_ID);
+        its_message->set_instance(SAMPLE_INSTANCE_ID);
+        its_message->set_method(SAMPLE_SET_METHOD_ID);
+
+        vsomeip::byte_t its_data[512];
+        uint32_t its_size = 1;
+
+        while (running_) {
+            std::unique_lock<std::mutex> its_lock(notify_mutex_);
+            while (!is_offered_ && running_)
+                notify_condition_.wait(its_lock);
+            while (is_offered_ && running_) 
+            {
+				memset(its_data,'\0',sizeof(its_data));	
+				/*its_size=strlen(buff);
+				if(its_size>0)
+				{
+					memcpy(its_data,buff,strlen(buff));
+					std::cout<<"length: "<<its_size<<std::endl;
+					memset(buff,'\0',sizeof(buff));
+				}
+				else*/
+				memcpy(its_data,"Hello",strlen("Hello"));
+				
+				std::lock_guard<std::mutex> its_lock(payload_mutex_);
+				//payload_->set_data(its_data, its_size);
+				payload_->set_data(its_data,its_size);
+
+				//std::cout <<std::endl<< "Setting event (Length=" << std::dec << its_size << ")." << std::endl;
+				app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_EVENT_ID, payload_);
+				std::cout<<its_data<<std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_));
+            }
+        }
+    }	
+    #endif
+#if 0	
     void notify() {
 	
         std::shared_ptr<vsomeip::message> its_message
@@ -202,46 +248,36 @@ public:
         its_message->set_instance(SAMPLE_INSTANCE_ID);
         its_message->set_method(SAMPLE_SET_METHOD_ID);
 
-        vsomeip::byte_t its_data[124];
-        //uint32_t its_size = 1;
+        vsomeip::byte_t its_data[512];
+        uint32_t its_size = 1;
 
         while (running_) {
             std::unique_lock<std::mutex> its_lock(notify_mutex_);
             while (!is_offered_ && running_)
                 notify_condition_.wait(its_lock);
-            while (is_offered_ && running_) {
-                {
-            		memset(its_data,'\0',sizeof(its_data));
-			
-					if(data_len>0)
-					{
-						
-						memcpy(its_data,buff,strlen(buff));
-						memset(buff,'\0',sizeof(buff));
-						data_len=0;
-					}
-					else
-						{
-							//memcpy(its_data,"Hello",strlen("hello"));
-						}
-						
-					std::lock_guard<std::mutex> its_lock(payload_mutex_);
-					//payload_->set_data(its_data, its_size);
-					payload_->set_data(its_data,strlen(payload));
+            while (is_offered_ && running_) 
+            {
+				memset(buff,'\0',sizeof(buff));
+				memset(its_data,'\0',sizeof(its_data));
+				its_size=serial_1(buff);
+				//sprintf(buff,"%d\n",its_size++);
+				//if(its_size>=20000)its_size=0;
+				std::cout<<"Received buff:"<<buff<<std::endl;
+				//its_size=(int)strlen(buff);
+				std::cout<<"length: "<<its_size<<std::endl;
+				memcpy(its_data,buff,strlen(buff));
+				std::lock_guard<std::mutex> its_lock(payload_mutex_);
+				//payload_->set_data(its_data, its_size);
+				payload_->set_data(its_data,its_size);
 
-					//std::cout <<std::endl<< "Setting event (Length=" << std::dec << its_size << ")." << std::endl;
-					app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_EVENT_ID, payload_);
-					//std::cout<<its_data<<std::endl;
-					
-                }
-
-                //its_size++;
-
-               // std::this_thread::sleep_for(std::chrono::milliseconds(cycle_));
+				//std::cout <<std::endl<< "Setting event (Length=" << std::dec << its_size << ")." << std::endl;
+				app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_EVENT_ID, payload_);
+				std::cout<<its_data<<std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_));
             }
         }
     }
-
+#endif
 private:
     std::shared_ptr<vsomeip::application> app_;
     bool is_registered_;
@@ -287,7 +323,10 @@ int main(int argc, char **argv) {
     std::string tcp_enable("--tcp");
     std::string udp_enable("--udp");
     std::string cycle_arg("--cycle");
-	serial_init();
+    serial_init();
+    memset(buff,'\0',sizeof(buff));
+   // thread th1(serial_1, buff);
+
     for (int i = 1; i < argc; i++) {
         if (tcp_enable == argv[i]) {
             use_tcp = true;
@@ -312,6 +351,7 @@ int main(int argc, char **argv) {
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
 #endif
+	//th1.join();
     if (its_sample.init()) {
         its_sample.start();
         return 0;

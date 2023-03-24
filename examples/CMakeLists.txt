@@ -24,13 +24,22 @@ target_link_libraries(response-sample ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LI
 add_executable(subscribe-sample subscribe-sample.cpp ${EXAMPLE_CONFIG_FILES})
 target_link_libraries(subscribe-sample ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LIBRARY})
 
-add_executable(notify-sample notify-sample.cpp ${EXAMPLE_CONFIG_FILES})
-target_link_libraries(notify-sample ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LIBRARY})
+add_executable(notify-sample notify-sample.cpp hello.cpp serial.cpp ${EXAMPLE_CONFIG_FILES})
+target_link_libraries(notify-sample ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LIBRARY} -lCppLinuxSerial -pthread)
 
-add_dependencies(examples request-sample response-sample subscribe-sample notify-sample)
+add_executable(cli cli.cpp ${EXAMPLE_CONFIG_FILES})
+target_link_libraries(cli ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LIBRARY})
+
+add_executable(ser ser.cpp ${EXAMPLE_CONFIG_FILES})
+target_link_libraries(ser ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LIBRARY})
+
+add_executable(cli_3 cli_3.cpp ${EXAMPLE_CONFIG_FILES})
+target_link_libraries(cli_3 ${VSOMEIP_NAME} ${Boost_LIBRARIES} ${DL_LIBRARY})
+
+add_dependencies(examples hello request-sample response-sample subscribe-sample notify-sample)
 
 install (
-    TARGETS request-sample response-sample subscribe-sample notify-sample
+    TARGETS request-sample response-sample subscribe-sample notify-sample cli ser cli_3
     RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
 )
 

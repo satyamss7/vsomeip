@@ -1,5 +1,5 @@
 {
-    "unicast" : "192.168.1.10",
+    "unicast" : "192.168.1.5",
     "netmask" : "255.255.255.0",
     "logging" : 
     {
@@ -12,28 +12,28 @@
     [
         {
             "name" : "client-sample",
-            "id" : "0x1343"
+            "id" : "0x2222"
         },
         {
             "name" : "second-client-sample",
-            "id" : "0x1344"
+            "id" : "0x2223"
         },
         {
             "name" : "third-client-sample",
-            "id" : "0x1345"
+            "id" : "0x2224"
         },
         {
             "name" : "fourth-client-sample",
-            "id" : "0x1346"
+            "id" : "0x2225"
         }
     ],
     "clients" :
     [
-        {
-            "service" : "0x1234",
-            "instance" : "0x5678",
-            "unreliable" : [ 40000, 40002 ]
-        }
+    	{
+    		"service" : "0x1212",
+    		"instance" : "0x1234",
+    		"unreliable" : [ 40000, 40002 ]
+    	}
     ],
     "routing" : "client-sample",
     "service-discovery" :

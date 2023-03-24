@@ -4,3 +4,5 @@ by:
 # route add -net 224.0.0.0/4 dev eth0
 
 Other OSes may have different ways to do this.
+
+route add -net 224.244.224.245 eth0

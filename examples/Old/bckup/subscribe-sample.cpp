@@ -121,6 +121,7 @@ public:
 
                //its_message << its_payload->get_data();
                //vsomeip::byte_t its_data[10];
+               std::cout<<"Hi"<<std::endl;
         std::cout << its_payload->get_data()<< std::endl;       
        // std::cout << its_payload->get_data() << std::endl;
       // std::cout << "data:" << its_payload->get_data() << std::endl;

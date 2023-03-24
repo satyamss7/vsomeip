@@ -1,5 +1,6 @@
 {
     "unicast":"192.168.1.10",
+    "netmask" : "255.255.255.0",
     "logging":
     {
         "level":"debug",
@@ -8,11 +9,6 @@
 
     "applications":
     [
-        {
-            "name":"hello_world_service",
-            "id":"0x4444"
-        },
-
         {
             "name":"hello_world_client",
             "id":"0x5555"
@@ -24,12 +20,11 @@
         {
             "service":"0x1111",
             "instance":"0x2222",
-            "unicast":"192.168.1.02"
             "unreliable":"30509"
         }
     ],
 
-    "routing":"hello_world_service",
+    "routing":"hello_world_client",
     "service-discovery":
     {
         "enable":"false"

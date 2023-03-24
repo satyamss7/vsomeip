@@ -1,5 +1,5 @@
 {
-    "unicast" : "192.168.1.15",
+    "unicast" : "192.168.1.3",
     "logging" :
     { 
         "level" : "debug",
@@ -11,18 +11,14 @@
     [
         {
             "name" : "service-sample",
-            "id" : "0x1277"
-        },
-        {    
-            "name" : "client-sample",
-            "id" : "0x1344"
+            "id" : "0x1111"
         }
     ],
     "services" :
     [
         {
-            "service" : "0x1234",
-            "instance" : "0x5678",
+            "service" : "0x1212",
+            "instance" : "0x1234",
             "unreliable" : "30509",
             "events" : 
             [
@@ -62,7 +58,38 @@
                     "events" : [ "0x8777", "0x8779" ] 
                 }
             ]
-        }
+        },
+        {
+            "service" : "0x3434",
+            "instance" : "0x3456",
+            "unreliable" : "30509",
+            "multicast" : 
+            { 
+                "address" : "224.225.226.234", 
+                "port" : "32344"
+            }
+        },
+        {
+            "service" : "0x1213",
+            "instance" : "0x1233",
+            "unreliable" : "30509",
+            "events" : 
+            [
+                {
+                    "event" : "0x8773",
+                    "is_field" : "true",
+                    "update-cycle" : 2000
+                }
+            ],
+            "eventgroups" :
+            [
+                {
+                    "eventgroup" : "0x4453",
+                    "events" : [ "0x8773" ]
+
+                }
+            ]
+        }        
     ],
     "routing" : "service-sample",
     "service-discovery" :

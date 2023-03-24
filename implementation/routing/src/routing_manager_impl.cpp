@@ -3681,7 +3681,7 @@ void routing_manager_impl::start_ip_routing() {
 #ifdef _WIN32
     if_state_running_ = true;
 #endif
-
+    if_state_running_ = true;
     if (routing_ready_handler_) {
         routing_ready_handler_();
     }

@@ -12,21 +12,16 @@
 #include <sstream>
 #include <thread>
 #include <mutex>
-#include <string>
 #include <cstring>
-#include <cmath>
 
 #include <vsomeip/vsomeip.hpp>
 
-#include "serialprt.hpp"
-
 #include "sample-ids.hpp"
 
-char buff[512];
-int found=0;
-char payload[512]="{\"DD\":1,\"AD\":1,\"DW\":0,\"AW\":0,\"TD\":0,\"HD\":0,\"SD\":1,\"Dist\":00.00}";
-int data_len=0;
-int data_read_flg=0;
+#include "hello.hpp"
+#include "serialprt.hpp"
+
+
 class service_sample {
 public:
     service_sample(bool _use_tcp, uint32_t _cycle) :
@@ -38,58 +33,28 @@ public:
             running_(true),
             is_offered_(false),
             offer_thread_(std::bind(&service_sample::run, this)),
-            notify_thread_(std::bind(&service_sample::notify, this)),
-            serial_rx_thread_(std::bind(&service_sample::serial_rx, this)) { //Added by santhosh to read the serial data as serial data read is blocked read
+            notify_thread_(std::bind(&service_sample::notify, this)) {
     }
-    //Add by santhosh - This is serial read thread 
-	void serial_rx()
-	{
-		while(1)
-		{
-			data_len=serial_1(buff); // Read the UART0 data (UWB reciver )
-			data_read_flg=1;
-		}
-		
-	}
-    bool init() {
+
+bool init() {
         std::lock_guard<std::mutex> its_lock(mutex_);
 
         if (!app_->init()) {
             std::cerr << "Couldn't initialize application" << std::endl;
             return false;
         }
-        app_->register_state_handler(
-                std::bind(&service_sample::on_state, this,
-                        std::placeholders::_1));
-
-        app_->register_message_handler(
-                SAMPLE_SERVICE_ID,
-                SAMPLE_INSTANCE_ID,
-                SAMPLE_GET_METHOD_ID,
-                std::bind(&service_sample::on_get, this,
-                          std::placeholders::_1));
-
-        app_->register_message_handler(
-                SAMPLE_SERVICE_ID,
-                SAMPLE_INSTANCE_ID,
-                SAMPLE_SET_METHOD_ID,
-                std::bind(&service_sample::on_set, this,
-                          std::placeholders::_1));
-
+        app_->register_state_handler(std::bind(&service_sample::on_state, this,std::placeholders::_1));
+        std::cout<<"Santhosh"<<"\nserviceid:"<<SAMPLE_SERVICE_ID<<"\ninstanceid:"<<SAMPLE_INSTANCE_ID<<"\nmethodid"<<SAMPLE_GET_METHOD_ID<<std::endl;
+        app_->register_message_handler(SAMPLE_SERVICE_ID,SAMPLE_INSTANCE_ID,SAMPLE_GET_METHOD_ID,std::bind(&service_sample::on_get, this,std::placeholders::_1));
+        app_->register_message_handler(SAMPLE_SERVICE_ID,SAMPLE_INSTANCE_ID,SAMPLE_SET_METHOD_ID,std::bind(&service_sample::on_set, this,std::placeholders::_1));
         std::set<vsomeip::eventgroup_t> its_groups;
         its_groups.insert(SAMPLE_EVENTGROUP_ID);
-        app_->offer_event(
-                SAMPLE_SERVICE_ID,
-                SAMPLE_INSTANCE_ID,
-                SAMPLE_EVENT_ID,
-                its_groups,
-                vsomeip::event_type_e::ET_FIELD, std::chrono::milliseconds::zero(),
-                false, true, nullptr, vsomeip::reliability_type_e::RT_UNKNOWN);
+        std::cout<<"santhosh"<<"offer_event"<<std::endl;
+        app_->offer_event(SAMPLE_SERVICE_ID,SAMPLE_INSTANCE_ID,SAMPLE_EVENT_ID,its_groups,vsomeip::event_type_e::ET_FIELD, std::chrono::milliseconds::zero(),false, true, nullptr, vsomeip::reliability_type_e::RT_UNKNOWN);
         {
             std::lock_guard<std::mutex> its_lock(payload_mutex_);
             payload_ = vsomeip::runtime::get()->create_payload();
         }
-
         blocked_ = true;
         condition_.notify_one();
         return true;
@@ -104,6 +69,7 @@ public:
      * Handle signal to shutdown
      */
     void stop() {
+        std::cout<<"santhosh:stop()"<<std::endl;
         running_ = false;
         blocked_ = true;
         condition_.notify_one();
@@ -112,11 +78,11 @@ public:
         stop_offer();
         offer_thread_.join();
         notify_thread_.join();
-        serial_rx_thread_.join();
         app_->stop();
     }
 #endif
 
+    /*This function is used to offer the service. This offers service_id and instance_id*/
     void offer() {
         std::lock_guard<std::mutex> its_lock(notify_mutex_);
         app_->offer_service(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID);
@@ -124,11 +90,13 @@ public:
         notify_condition_.notify_one();
     }
 
+	/*This function is used to stop offering the service */
     void stop_offer() {
         app_->stop_offer_service(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID);
         is_offered_ = false;
     }
 
+	/*On state this function is used for application register / deregister */
     void on_state(vsomeip::state_type_e _state) {
         std::cout << "Application " << app_->get_name() << " is "
         << (_state == vsomeip::state_type_e::ST_REGISTERED ?
@@ -143,6 +111,7 @@ public:
         }
     }
 
+/*On get create a response message, set payload and send the response*/
     void on_get(const std::shared_ptr<vsomeip::message> &_message) {
         std::shared_ptr<vsomeip::message> its_response
             = vsomeip::runtime::get()->create_response(_message);
@@ -153,27 +122,22 @@ public:
         app_->send(its_response);
     }
 
+/*on Set create response, set payload, send response and notify*/ 
     void on_set(const std::shared_ptr<vsomeip::message> &_message) {
         std::shared_ptr<vsomeip::message> its_response
             = vsomeip::runtime::get()->create_response(_message);
         {
             std::lock_guard<std::mutex> its_lock(payload_mutex_);
             payload_ = _message->get_payload();
-		//payload_->set_data(static_cast<uint8_t>(1),1);
-		//std::string str("Hello");
-		//std::vector<vsomeip::byte_t> payload_data(std::begin(str), std::end(str));
-		//payload_->set_data(payload_data);
-		//its_response->set_payload(payload_);
             its_response->set_payload(payload_);
-		//its_response->set_payload("Hello");
-		//std::cout<<"Payload : "<<payload_;
         }
 
-        //app_->send(its_response);
-        //app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID,
-          //           SAMPLE_EVENT_ID, payload_);
+        app_->send(its_response);
+        app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID,
+                     SAMPLE_EVENT_ID, payload_);
     }
 
+/*Run is used to offer the service or stop offering the service*/
     void run() {
         std::unique_lock<std::mutex> its_lock(mutex_);
         while (!blocked_)
@@ -189,12 +153,12 @@ public:
             for (int i = 0; i < 10 && running_; i++)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-          //  is_offer = !is_offer; // Commented by santhosh - To remove stop offering condition. 
+            is_offer = !is_offer;
         }
     }
-	
+
+/*This function is used to set the service, instance and method*/
     void notify() {
-	
         std::shared_ptr<vsomeip::message> its_message
             = vsomeip::runtime::get()->create_request(use_tcp_);
 
@@ -202,42 +166,41 @@ public:
         its_message->set_instance(SAMPLE_INSTANCE_ID);
         its_message->set_method(SAMPLE_SET_METHOD_ID);
 
-        vsomeip::byte_t its_data[124];
-        //uint32_t its_size = 1;
+        vsomeip::byte_t its_data[10];
+        uint32_t its_size = 1;
 
         while (running_) {
             std::unique_lock<std::mutex> its_lock(notify_mutex_);
             while (!is_offered_ && running_)
                 notify_condition_.wait(its_lock);
             while (is_offered_ && running_) {
+             /* if (its_size == sizeof(its_data))
+                    its_size = 1;
+				std::cout<<"size of:"<<sizeof(its_data);
+                for (uint32_t i = 0; i < its_size; ++i) 
+                    its_data[i] = static_cast<uint8_t>(i);
+					//memcpy(	its_data,"Hello",strlen("Hello"));
                 {
-            		memset(its_data,'\0',sizeof(its_data));
-			
-					if(data_len>0)
-					{
-						
-						memcpy(its_data,buff,strlen(buff));
-						memset(buff,'\0',sizeof(buff));
-						data_len=0;
-					}
-					else
-						{
-							//memcpy(its_data,"Hello",strlen("hello"));
-						}
-						
-					std::lock_guard<std::mutex> its_lock(payload_mutex_);
-					//payload_->set_data(its_data, its_size);
-					payload_->set_data(its_data,strlen(payload));
+                    std::lock_guard<std::mutex> its_lock(payload_mutex_);
+                    payload_->set_data(its_data,its_size);// strlen("Hello"));
 
-					//std::cout <<std::endl<< "Setting event (Length=" << std::dec << its_size << ")." << std::endl;
-					app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_EVENT_ID, payload_);
-					//std::cout<<its_data<<std::endl;
-					
+                    std::cout << "Setting event (Length=" << std::dec << its_size << ")." << std::endl;
+                    app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_EVENT_ID, payload_);
+                    std::cout<<"Santhosh:"<<its_data;
+                    std::cout<<std::endl;
                 }
-
-                //its_size++;
-
-               // std::this_thread::sleep_for(std::chrono::milliseconds(cycle_));
+                its_size++;*/
+                memset(its_data,'\0',sizeof(its_data));
+                memcpy(	its_data,"ABCDE\n",strlen("ABCDE\n"));
+                its_size=6;
+                
+                std::lock_guard<std::mutex> its_lock(payload_mutex_);
+                payload_->set_data(its_data, its_size);
+				app_->notify(SAMPLE_SERVICE_ID, SAMPLE_INSTANCE_ID, SAMPLE_EVENT_ID, payload_);
+				std::cout<<"len:"<<its_size<<"Santhosh:"<<its_data;
+				std::cout<<std::endl;
+				
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_));
             }
         }
     }
@@ -263,7 +226,6 @@ private:
     // blocked_ / is_offered_ must be initialized before starting the threads!
     std::thread offer_thread_;
     std::thread notify_thread_;
-    std::thread serial_rx_thread_;
 };
 
 #ifndef VSOMEIP_ENABLE_SIGNAL_HANDLING
@@ -276,18 +238,15 @@ private:
 #endif
 
 int main(int argc, char **argv) {
-	//out();
 	
-	//serial_1(buff);
-	//std::cout<<buff;
-	//std::cout<<"Length : "<<buff.length();
     bool use_tcp = false;
     uint32_t cycle = 1000; // default 1s
-
+	//fun();
+	//serial_rd();
     std::string tcp_enable("--tcp");
     std::string udp_enable("--udp");
     std::string cycle_arg("--cycle");
-	serial_init();
+
     for (int i = 1; i < argc; i++) {
         if (tcp_enable == argv[i]) {
             use_tcp = true;
